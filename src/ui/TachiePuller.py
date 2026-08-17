@@ -14,13 +14,14 @@ from PySide6.QtWidgets import (
 from ..base import Config
 from ..logger import logger
 from ..module.AdbHelper import AdbHelper
+from ..utility import resource_path
 
 
 class TachiePuller(QDialog):
     def __init__(self, data: dict[str, list[str]]):
         super().__init__()
         self.setWindowTitle(self.tr("AzurLane Tachie Helper"))
-        self.setWindowIcon(QPixmap("ico/cheshire.ico"))
+        self.setWindowIcon(QPixmap(resource_path("cheshire.ico")))
         self.resize(300, 50)
 
         self.data = data

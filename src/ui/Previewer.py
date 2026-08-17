@@ -5,7 +5,7 @@ from typing import Callable
 
 from PIL import Image, ImageOps
 from PySide6.QtCore import QDir, Qt
-from PySide6.QtGui import QAction, QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -66,10 +66,11 @@ class SliderPanel(QWidget):
 
 
 class Previewer(QWidget):
-    def __init__(self, aEncodeTexture: QAction):
+    def __init__(self, on_encode: Callable):
         super().__init__()
-        self.aEncodeTexture = aEncodeTexture
+        self.on_encode = on_encode
         self.layer: Layer | FaceLayer | IconLayer = None
+        self.faces: dict[str, FaceLayer] = {}
         self.fit: Callable[[Image.Image], Image.Image] = None
 
         self.lPath = QLabel()
@@ -102,31 +103,47 @@ class Previewer(QWidget):
 
         return inner
 
+    def sync_slider(self):
+        """模式/图层联动：custom 且选中 painting/face 时显示扩展微调框，否则隐藏。"""
+        if Config.get_face_mode() != FaceModeType.Custom or self.layer is None:
+            self.slider_panel.setVisible(False)
+            return
+        if isinstance(self.layer, IconLayer):
+            self.slider_panel.setVisible(False)
+        elif isinstance(self.layer, FaceLayer):
+            self.slider_panel.set_data(
+                self.layer.meta.name_stem, "paintingface", self.callback_wrapper(self.refresh_all_faces)
+            )
+            self.slider_panel.setVisible(True)
+        else:  # painting Layer
+            self.slider_panel.set_data(
+                self.layer.meta.name_stem, self.layer.validName, self.callback_wrapper(self.layer.refresh)
+            )
+            self.slider_panel.setVisible(True)
+
+    def refresh_all_faces(self):
+        """刷新所有 face 图层（face 扩展变化后全部重新裁剪）。"""
+        with ThreadPoolExecutor(max_workers=len(self.faces)) as executor:
+            executor.map(lambda x: x.refresh(), self.faces.values())
+
     def display_painting(self, layer: Layer):
         self.layer = layer
         self.fit = partial(ImageOps.contain, size=(512, 512), method=Image.Resampling.BICUBIC)
         self.lPath.setText(self.tr("Path:") + QDir.toNativeSeparators(layer.path))
         self.lName.setText(self.tr("Name: ") + layer.texture2D.m_Name)
-        if Config.get_face_mode() == FaceModeType.Custom:
-            self.slider_panel.setVisible(True)
-            self.slider_panel.set_data(layer.meta.name_stem, layer.validName, self.callback_wrapper(layer.refresh))
+        self.sync_slider()
         self.refresh()
 
     def display_face(self, layers: dict[str, FaceLayer], idx: str):
-        def all_refresh():
-            with ThreadPoolExecutor(max_workers=len(layers)) as executor:
-                executor.map(lambda x: x.refresh(), layers.values())
-
         self.layer = layers[idx]
+        self.faces = layers
         if Config.get_face_mode() != FaceModeType.Off:
             self.fit = partial(ImageOps.contain, size=(512, 512), method=Image.Resampling.BICUBIC)
         else:
             self.fit = lambda x: x
         self.lName.setText(self.tr("Name: ") + self.layer.name)
         self.lPath.setText(self.tr("Path:") + QDir.toNativeSeparators(self.layer.path))
-        if Config.get_face_mode() == FaceModeType.Custom:
-            self.slider_panel.setVisible(True)
-            self.slider_panel.set_data(self.layer.meta.name_stem, "paintingface", self.callback_wrapper(all_refresh))
+        self.sync_slider()
         self.refresh()
 
     def display_icon(self, layer: IconLayer):
@@ -134,7 +151,7 @@ class Previewer(QWidget):
         self.fit = lambda x: x
         self.lName.setText(self.tr("Name: ") + layer.name)
         self.lPath.setText(self.tr("Path:") + QDir.toNativeSeparators(layer.path))
-        self.slider_panel.setVisible(False)
+        self.sync_slider()
         self.refresh()
 
     def refresh(self):
@@ -158,6 +175,6 @@ class Previewer(QWidget):
                 else:
                     self.load_painting(link)
 
-        self.aEncodeTexture.setEnabled(True)
+        self.on_encode()
         self.refresh()
         event.accept()

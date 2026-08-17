@@ -15,6 +15,7 @@ default = {
     "system/Serial": "auto",
     "system/Server": "CN",
     "system/Package": "",
+    "system/SkipMissing": "true",
 }
 
 
@@ -115,6 +116,14 @@ def get_serial() -> str:
 
 def set_serial(serial: str):
     set_config("system/Serial", serial)
+
+
+def get_skip_missing() -> bool:
+    return get_config("system/SkipMissing")
+
+
+def set_skip_missing(v: bool):
+    set_config("system/SkipMissing", v)
 
 
 def get_server() -> str:

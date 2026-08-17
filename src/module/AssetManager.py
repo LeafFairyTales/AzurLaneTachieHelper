@@ -52,12 +52,28 @@ class AssetManager:
         return EncodeHelper.exec(dir, self.layers, self.faces, self.icons)
 
     def get_dependency(self, file: str) -> list[str]:
-        if not os.path.exists("dependencies"):
-            AdbHelper.pull("dependencies", add_prefix=True)
-        env = UnityPy.load("dependencies")
-        mb: MonoBehaviour = [x.parse_as_object() for x in env.objects if x.type == ClassIDType.MonoBehaviour][0]
-        idx = mb.m_Keys.index(f"painting/{os.path.basename(file)}")
-        return mb.m_Values[idx].m_Dependencies
+        try:
+            if not os.path.exists("dependencies"):
+                AdbHelper.pull("dependencies", add_prefix=True)
+            env = UnityPy.load("dependencies")
+            mb: MonoBehaviour = [x.parse_as_object() for x in env.objects if x.type == ClassIDType.MonoBehaviour][0]
+            idx = mb.m_Keys.index(f"painting/{os.path.basename(file)}")
+            return mb.m_Values[idx].m_Dependencies
+        except Exception:
+            if not Config.get_skip_missing():
+                raise
+        # Skip Missing 开启时的离线回退：扫描索引同目录下同基名的贴图 bundle
+        base = os.path.basename(file).removesuffix("_n")
+        dirname = os.path.dirname(file)
+        deps = [
+            f
+            for f in os.listdir(dirname)
+            if os.path.isfile(os.path.join(dirname, f))
+            and f.startswith(base)
+            and f.endswith("_tex")
+            and f != os.path.basename(file)
+        ]
+        return deps
 
     def analyze(self, file: str):
         self.init()
@@ -68,7 +84,11 @@ class AssetManager:
         env = UnityPy.load(file)
         for dep in self.deps:
             path = os.path.join(os.path.dirname(file) + "/", dep)
-            assert os.path.exists(path), f"Dependency not found: {dep}"
+            if not os.path.exists(path):
+                if Config.get_skip_missing():
+                    logger.attr("Skipped missing dependency", dep)
+                    continue
+                raise FileNotFoundError(f"Dependency not found: {dep}")
             env.load_file(path)
 
         file_map = {
@@ -88,51 +108,105 @@ class AssetManager:
             self.layers["face"] = base_layer.get_child("face")
 
         for k in set(self.layers.keys()) - {"face"}:
-            if self.layers[k].texture2D is None:
+            layer = self.layers[k]
+            if layer.texture2D is None or (Config.get_skip_missing() and layer.mesh_missing):
+                if Config.get_skip_missing():
+                    logger.attr("Skipped missing layer", layer.name)
                 self.layers.pop(k)
             else:
-                logger.attr(self.layers[k].__repr__(), self.layers[k].__str__())
+                logger.attr(layer.__repr__(), layer.__str__())
 
-        x_min = min([_.posMin.X for _ in self.layers.values()])
-        x_max = max([_.posMax.X for _ in self.layers.values()])
-        y_min = min([_.posMin.Y for _ in self.layers.values()])
-        y_max = max([_.posMax.Y for _ in self.layers.values()])
+        usable = [x for x in self.layers.values() if x is not None]
+        if not usable:
+            raise RuntimeError("No usable layers: all sprites/textures are missing")
+        x_min = min([_.posMin.X for _ in usable])
+        x_max = max([_.posMax.X for _ in usable])
+        y_min = min([_.posMin.Y for _ in usable])
+        y_max = max([_.posMax.Y for _ in usable])
         size = Vector2(x_max - x_min, y_max - y_min)
         bias = Vector2(-x_min, -y_min)
 
         self.meta = MetaInfo(file, base_layer.name, size, bias)
 
         base = os.path.basename(file).removesuffix("_n")
-        path = os.path.join(os.path.dirname(file), "paintingface", base)
-        if os.path.exists(path):
-            env = UnityPy.load(path)
-            tex2ds: list[Texture2D] = [x.parse_as_object() for x in env.objects if x.type == ClassIDType.Texture2D]
-            self.faces = {x.m_Name: FaceLayer(self.meta, x, path) for x in tex2ds}
-            self.faces = {k: v for k, v in sorted(self.faces.items(), key=lambda x: int(x[0]))}
+        painting_dir = os.path.dirname(file)
+        root = os.path.dirname(painting_dir)
+        path = next(
+            (
+                p
+                for p in [
+                    os.path.join(painting_dir, "paintingface", base),
+                    os.path.join(root, "paintingface", base),
+                ]
+                if os.path.exists(p)
+            ),
+            None,
+        )
+        if path:
+            try:
+                env = UnityPy.load(path)
+                tex2ds: list[Texture2D] = [
+                    x.parse_as_object() for x in env.objects if x.type == ClassIDType.Texture2D
+                ]
+                self.faces = {x.m_Name: FaceLayer(self.meta, x, path) for x in tex2ds}
+                self.faces = {k: v for k, v in sorted(self.faces.items(), key=lambda x: int(x[0]))}
+            except Exception:
+                if not Config.get_skip_missing():
+                    raise
+                logger.attr("Skipped paintingface", base)
 
-        for k, v in self.layers.items():
+        for k in set(self.layers.keys()):
+            v = self.layers[k]
             v.meta = self.meta
-            if k != "face":
-                v.path = file_map[v.texture2D.m_Name.lower()]
-                if Config.get_face_extension(self.meta.name_stem, k) is None:
-                    Config.set_face_extension(self.meta.name_stem, k, [0] * 4)
+            if k == "face":
+                continue
+            name = v.texture2D.m_Name.lower()
+            if name not in file_map:
+                if Config.get_skip_missing():
+                    logger.attr("Skipped missing texture", v.texture2D.m_Name)
+                    self.layers.pop(k)
+                    continue
+                raise KeyError(f"Texture not found in loaded bundles: {name}")
+            v.path = file_map[name]
+            if Config.get_face_extension(self.meta.name_stem, k) is None:
+                Config.set_face_extension(self.meta.name_stem, k, [0] * 4)
 
         presets = IconPresets()
         for k, v in presets.to_dict().items():
-            path = os.path.join(os.path.dirname(file), k, base)
-            if not os.path.exists(path):
-                path += ".ys"
-            if os.path.exists(path):
-                env = UnityPy.load(path)
-                for x in env.objects:
-                    if x.type == ClassIDType.Texture2D:
-                        tex2d: Texture2D = x.parse_as_object()
-                        if re.match(f"(?i)^{base}$", tex2d.m_Name):
-                            icon_layer = IconLayer(self.meta, tex2d, path)
-                self.icons[k] = icon_layer
+            path = next(
+                (
+                    p
+                    for p in [
+                        os.path.join(painting_dir, k, base),
+                        os.path.join(painting_dir, k, base + ".ys"),
+                        os.path.join(root, k, base),
+                        os.path.join(root, k, base + ".ys"),
+                    ]
+                    if os.path.exists(p)
+                ),
+                None,
+            )
+            if path:
+                try:
+                    env = UnityPy.load(path)
+                    icon_layer = None
+                    for x in env.objects:
+                        if x.type == ClassIDType.Texture2D:
+                            tex2d: Texture2D = x.parse_as_object()
+                            # 名字匹配优先；内部名 ≠ 文件名（用户改名）时兜底取第一个 Texture2D
+                            if icon_layer is None or re.match(f"(?i)^{base}$", tex2d.m_Name):
+                                icon_layer = IconLayer(self.meta, tex2d, path)
+                    self.icons[k] = icon_layer
+                except Exception:
+                    if not Config.get_skip_missing():
+                        raise
+                    logger.attr("Skipped icon", f"{k}/{base}")
 
-    def clip_icons(self, workload: str, presets: IconPresets) -> list[str]:
+    def clip_icons(self, workload: str, presets: IconPresets, kinds: list[str] = None) -> list[str]:
         full, center = self.prepare_icon(workload)
+
+        # kinds=None 裁剪全部三种图标；指定时只裁剪对应图标
+        items = {k: presets[k] for k in (kinds or list(presets.to_dict().keys())) if k in presets.to_dict()}
 
         def clip(kind: str, preset: IconPreset):
             w, h = preset.size / preset.scale
@@ -152,18 +226,29 @@ class AssetManager:
                 img = Image.fromarray(data)
                 img.alpha_composite(sub)
 
-            path = os.path.join(os.path.dirname(self.meta.path), f"{kind}.png")
+            # 图标裁剪产物输出到导出文件夹 image_{模式}（与图层 PNG 同处）；bundle 加密输出留在 output_{模式}
+            mode_name = Config.get_face_mode().name.lower()
+            out_dir = os.path.join(os.path.dirname(self.meta.path), f"image_{mode_name}")
+            os.makedirs(out_dir, exist_ok=True)
+            path = os.path.join(out_dir, f"{kind}.png")
             img.crop((x, y, x + w, y + h)).transpose(Image.Transpose.FLIP_TOP_BOTTOM).save(path)
 
             return path
 
         with ThreadPoolExecutor(max_workers=8) as executor:
-            output = executor.map(clip, presets.to_dict().keys(), presets.to_dict().values())
+            output = executor.map(clip, items.keys(), items.values())
 
         return list(output)
 
     def prepare_icon(self, file: str) -> tuple[Image.Image, Vector2]:
-        prefered = prefered_layer(self.layers, self.face_layer)
-        full = open_and_transpose(file).crop(prefered.box)
-        center = self.face_layer.posMin - prefered.posMin + self.face_layer.sizeDelta / 2
-        return full.resize(prefered.sizeDelta.round()), center
+        """整图直接导入，不裁剪不缩放，纯让用户在完整图上调整图标框。
+
+        face 中心（画布坐标）按参考图与画布尺寸比例映射到参考图像素坐标，
+        保证裁剪框初始位置落在脸部附近；任何尺寸/内容的参考图都可操作。
+        """
+        full = open_and_transpose(file)
+        cw, ch = self.meta.size.round().tuple()
+        fw, fh = full.size
+        fc = self.face_layer.posMin + self.face_layer.sizeDelta / 2  # face 中心（画布坐标）
+        center = Vector2(fc.X * fw / cw, fc.Y * fh / ch)
+        return full, center

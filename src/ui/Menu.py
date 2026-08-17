@@ -1,28 +1,11 @@
-import os
 from functools import partial
 from typing import Callable
 
-import UnityPy
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMenu
-from UnityPy.classes import MonoBehaviour
-from UnityPy.enums import ClassIDType
 
 from ..base import Config
 from ..base.Data import FaceModeType
-from ..module.AdbHelper import AdbHelper
-from ..ui.TachiePuller import TachiePuller
-
-
-def pull_tachie():
-    if not os.path.exists("dependencies"):
-        AdbHelper.pull("dependencies", add_prefix=True)
-    env = UnityPy.load("dependencies")
-    mb: MonoBehaviour = [x.parse_as_object() for x in env.objects if x.type == ClassIDType.MonoBehaviour][0]
-    data = {k: v.m_Dependencies for k, v in zip(mb.m_Keys, mb.m_Values) if k.startswith("painting/")}
-    puller = TachiePuller(data)
-    if puller.exec():
-        pass
 
 
 class File(QMenu):
@@ -30,33 +13,37 @@ class File(QMenu):
         super().__init__()
         self.setTitle(self.tr("File"))
 
+        # 区域 1 · 文件打开
         self.aOpenMetadata = QAction(self.tr("Open Metadata"), shortcut="Ctrl+S", enabled=True, triggered=cbs[0])
-        self.aImportPainting = QAction(self.tr("Import Painting"), shortcut="Ctrl+W", enabled=False, triggered=cbs[1])
-        self.aImportFaces = QAction(self.tr("Import Paintingface"), shortcut="Ctrl+Q", enabled=False, triggered=cbs[2])
-        self.aImportIcons = QAction(self.tr("Import Icons"), shortcut="Ctrl+A", enabled=False, triggered=cbs[3])
-        self.aPullDeps = QAction(
-            self.tr("Pull Dependencies"),
-            shortcut="Ctrl+Z",
-            enabled=True,
-            triggered=lambda: AdbHelper.pull("dependencies", add_prefix=True),
-        )
-        self.aPullTachie = QAction(self.tr("Pull Tachie"), shortcut="Ctrl+X", enabled=True, triggered=pull_tachie)
+        # 区域 2 · PSD 相关
+        self.aDecodePsd = QAction(self.tr("Decode to PSD"), shortcut="Ctrl+D", enabled=False, triggered=cbs[1])
+        self.aImportPsd = QAction(self.tr("Import From PSD"), enabled=False, triggered=cbs[2])
+        # 区域 3 · 普通流程（批量导入/导出，需先 Open Metadata 才能启用）
+        self.aExportImages = QAction(self.tr("Export Images"), enabled=False, triggered=cbs[3])
+        self.aImportImages = QAction(self.tr("Import From Images"), enabled=False, triggered=cbs[4])
+        self.aExportImport = QAction(self.tr("Export && Import"), enabled=False, triggered=cbs[5])
 
-        self.addActions([self.aOpenMetadata, self.aImportPainting, self.aImportFaces, self.aImportIcons])
+        self.addAction(self.aOpenMetadata)
         self.addSeparator()
-        self.addActions([self.aPullDeps, self.aPullTachie])
+        self.addActions([self.aDecodePsd, self.aImportPsd])
+        self.addSeparator()
+        self.addActions([self.aExportImages, self.aImportImages, self.aExportImport])
 
 
 class Edit(QMenu):
     def __init__(self, *cbs: list[Callable]):
         super().__init__()
-        self.setTitle(self.tr("Edit"))
+        self.setTitle(self.tr("Icon"))
 
-        self.aClipIcons = QAction(self.tr("Clip Icons"), shortcut="Ctrl+C", enabled=False, triggered=cbs[0])
-        self.aDecodeTexture = QAction(self.tr("Decode Texture"), shortcut="Ctrl+D", enabled=False, triggered=cbs[1])
-        self.aEncodeTexture = QAction(self.tr("Encode Texture"), shortcut="Ctrl+E", enabled=False, triggered=cbs[2])
+        # 图标裁剪：一键三种（原 Clip Icons 改名）+ 各自独立入口；裁剪后自动 encode，无手动 Encode
+        self.aClipAllIcons = QAction(self.tr("Clip All Icons"), shortcut="Ctrl+C", enabled=False, triggered=cbs[0])
+        self.aClipShipyardicon = QAction(self.tr("Clip Shipyard Icon"), enabled=False, triggered=cbs[1])
+        self.aClipHerohrzicon = QAction(self.tr("Clip Herohrz Icon"), enabled=False, triggered=cbs[2])
+        self.aClipSquareicon = QAction(self.tr("Clip Square Icon"), enabled=False, triggered=cbs[3])
 
-        self.addActions([self.aClipIcons, self.aDecodeTexture, self.aEncodeTexture])
+        self.addActions(
+            [self.aClipAllIcons, self.aClipShipyardicon, self.aClipHerohrzicon, self.aClipSquareicon]
+        )
 
 
 class FaceMode(QMenu):
@@ -140,11 +127,24 @@ class Option(QMenu):
         super().__init__()
         self.setTitle(self.tr("Option"))
 
+        self.cbs = cbs
         self.aFaceMode = FaceMode(*cbs)
         self.aMeshMode = MeshMode()
         self.mServer = Server(cbs[0])
+        self.aSkipMissing = QAction(
+            self.tr("Skip Missing Resources"), checkable=True, triggered=self.toggle_skip_missing
+        )
 
         self.addMenu(self.aFaceMode)
         self.addMenu(self.aMeshMode)
         self.addSeparator()
         self.addMenu(self.mServer)
+        self.addAction(self.aSkipMissing)
+        self.flush()
+
+    def toggle_skip_missing(self, _: bool):
+        Config.set_skip_missing(self.aSkipMissing.isChecked())
+        self.cbs[0]()
+
+    def flush(self):
+        self.aSkipMissing.setChecked(Config.get_skip_missing())

@@ -1,4 +1,13 @@
 import logging
+import sys
+
+# Windows 下统一 UTF-8 输出：避免 GBK 代码页/管道把 rich 日志（│ 等字符）渲染成乱码
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 from rich.console import Console
 from rich.logging import RichHandler

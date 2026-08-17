@@ -110,21 +110,55 @@ class Layer:
         if self.monoBehaviour is None or not hasattr(self.monoBehaviour, "m_Sprite"):
             return None
         sprite: PPtr = self.monoBehaviour.m_Sprite
-        return sprite.deref_parse_as_object() if sprite.m_PathID != 0 else None
+        if sprite.m_PathID == 0:
+            return None
+        try:
+            return sprite.deref_parse_as_object()
+        except FileNotFoundError:
+            if Config.get_skip_missing():
+                return None
+            raise
 
     @cached_property
     def texture2D(self) -> Optional[Texture2D]:
         if self.sprite is None:
             return None
         tex2d: PPtr = self.sprite.m_RD.texture
-        return tex2d.deref_parse_as_object() if tex2d.m_PathID != 0 else None
+        if tex2d.m_PathID == 0:
+            return None
+        try:
+            return tex2d.deref_parse_as_object()
+        except FileNotFoundError:
+            if Config.get_skip_missing():
+                return None
+            raise
 
     @cached_property
     def mesh(self) -> Optional[Mesh]:
         if self.monoBehaviour is None or not hasattr(self.monoBehaviour, "mMesh"):
             return None
         mesh: PPtr = self.monoBehaviour.mMesh
-        return mesh.deref_parse_as_object() if mesh.m_PathID != 0 else None
+        if mesh.m_PathID == 0:
+            return None
+        try:
+            return mesh.deref_parse_as_object()
+        except FileNotFoundError:
+            if Config.get_skip_missing():
+                return None
+            raise
+
+    @cached_property
+    def mesh_missing(self) -> bool:
+        """引用了 mesh 但 mesh 解析失败（mesh 与贴图是一对，缺失时整个图层跳过）"""
+        if self.monoBehaviour is None or not hasattr(self.monoBehaviour, "mMesh"):
+            return False
+        mesh: PPtr = self.monoBehaviour.mMesh
+        if mesh.m_PathID == 0:
+            return False
+        try:
+            return self.mesh is None
+        except FileNotFoundError:
+            return True
 
     @cached_property
     def rawSpriteSize(self) -> Optional[Vector2]:

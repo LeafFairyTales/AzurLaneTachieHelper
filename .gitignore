@@ -2,6 +2,9 @@ __pycache__
 .DS_Store
 app.build
 app.dist
+build/
+dist/
+*.spec
 char
 dependencies
 out

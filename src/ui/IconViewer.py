@@ -134,14 +134,20 @@ class Icon(QWidget):
 
 
 class IconViewer(QDialog):
-    def __init__(self, name: str, refs: dict[str, IconLayer], img: Image.Image, center: Vector2):
+    def __init__(self, name: str, refs: dict[str, IconLayer], img: Image.Image, center: Vector2, kinds: list[str] = None):
         super().__init__()
         self.setWindowTitle(self.tr("AzurLane Tachie Helper"))
         self.setWindowIcon(QPixmap("ico/cheshire.ico"))
 
-        self.icons: dict[str, Icon] = {}
         self.presets = Config.get_presets(name)
-        for k, v in self.presets.to_dict().items():
+        all_kinds = list(self.presets.to_dict().keys())
+        # kinds=None 显示并处理全部三种图标；指定时只显示/处理对应图标
+        self.kinds = kinds if kinds is not None else all_kinds
+        self.icons: dict[str, Icon] = {}
+        for k in self.kinds:
+            if k not in all_kinds:
+                continue
+            v = self.presets[k]
             ref = refs[k].decode() if k in refs else Image.new("RGBA", v.size.tuple())
             v.size = Vector2(ref.size)
             self.icons[k] = Icon(img, ref, v, center, self.setLast)
@@ -153,9 +159,9 @@ class IconViewer(QDialog):
 
     def _init_ui(self):
         layout1 = QHBoxLayout()
-        layout1.addWidget(self.icons["shipyardicon"])
-        layout1.addWidget(self.icons["herohrzicon"])
-        layout1.addWidget(self.icons["squareicon"])
+        for k in self.kinds:
+            if k in self.icons:
+                layout1.addWidget(self.icons[k])
 
         layout = QVBoxLayout()
         layout.addLayout(layout1)

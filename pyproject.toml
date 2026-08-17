@@ -20,9 +20,5 @@ dependencies = [
 [project.optional-dependencies]
 build = ["nuitka<2.6", "numpy<2.3"]
 
-[tool.uv.sources]
-pyqtdarktheme = { git = "https://github.com/5yutan5/PyQtDarkTheme.git" }
-pytoshop = { git = "https://github.com/MuteApo/pytoshop" }
-
 [[tool.uv.index]]
-url = "http://mirrors.aliyun.com/pypi/simple"
+url = "https://mirrors.aliyun.com/pypi/simple"

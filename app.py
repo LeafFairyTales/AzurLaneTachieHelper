@@ -9,15 +9,22 @@ import qdarktheme
 import UnityPy.config
 from PySide6.QtCore import QTranslator
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from src.TachieHelper import AzurLaneTachieHelper
+from src.utility import resource_path
 
 UnityPy.config.FALLBACK_UNITY_VERSION = "2022.3.62f3"
 
+NOTICE_TEXT = (
+    "本项目基于开源项目 AzurLaneTachieHelper 修改优化，由 @LeafFairyTales 完善。\n"
+    "源地址：https://github.com/MuteApo/AzurLaneTachieHelper\n"
+    "本工具仅供学习交流使用，请勿传播或用于商业用途。"
+)
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon("ico/cheshire.ico"))
+    app.setWindowIcon(QIcon(resource_path("cheshire.ico")))
     qdarktheme.setup_theme("auto")
 
     if sys.platform == "win32":
@@ -37,6 +44,14 @@ if __name__ == "__main__":
         trans = QTranslator(app)
         trans.load(path)
         app.installTranslator(trans)
+
+    # 启动确认：版权与使用声明
+    box = QMessageBox()
+    box.setWindowTitle("AzurLane Tachie Helper")
+    box.setIcon(QMessageBox.Icon.Information)
+    box.setText(NOTICE_TEXT)
+    box.setStandardButtons(QMessageBox.StandardButton.Ok)
+    box.exec()
 
     win = AzurLaneTachieHelper()
     win.show()

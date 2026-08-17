@@ -1,7 +1,6 @@
 import os
 import struct
 from typing import Literal
-
 import UnityPy
 from PIL import Image
 from rich.progress import Progress
@@ -16,9 +15,65 @@ from ..base.Vector import Vector2
 from ..utility import check_and_save
 
 
+def output_dir_name() -> str:
+    """当前 Paintingface 模式对应的输出目录名（output_off / output_auto / output_custom）。"""
+    return f"output_{Config.get_face_mode().name.lower()}"
+
+
 def set_sprite(sprite: Sprite, img: Image.Image):
-    sprite.m_Rect.width, sprite.m_Rect.height = img.size
-    sprite.m_RD.textureRect.width, sprite.m_RD.textureRect.height = img.size
+    w, h = img.size
+    old_w, old_h = sprite.m_Rect.width, sprite.m_Rect.height
+    sprite.m_Rect.width, sprite.m_Rect.height = w, h
+    sprite.m_RD.textureRect.width, sprite.m_RD.textureRect.height = w, h
+    # uvTransform = (scale, centerX, scale, centerY)：rect 已按新图更新，
+    # 中心必须同步，否则渲染仍按旧 rect 中心采样（sprite 显示不变）
+    try:
+        uv = sprite.m_RD.uvTransform
+        uv.y, uv.w = w / 2, h / 2
+    except (AttributeError, TypeError):
+        pass
+    # 渲染网格 m_VertexData：position = rect 世界坐标（±rect/2/PixelsToUnits），
+    # 简单四边形按新/旧尺寸比例缩放；多边形 Sprite（差分表情脸型轮廓）重写为
+    # 覆盖整个新 rect 的矩形，否则轮廓外区域不显示（底部不规则透明）。
+    # UV 保持（原版即 0，游戏 UI 自建 mesh）
+    if old_w and old_h:
+        sx, sy = w / old_w, h / old_h
+        try:
+            vd = sprite.m_RD.m_VertexData
+            n = vd.m_VertexCount
+            if n != 4:
+                ptu = sprite.m_PixelsToUnits or 100.0
+                hw, hh = w / 2 / ptu, h / 2 / ptu
+                pos = [-hw, hh, 0.0, hw, -hh, 0.0, hw, hh, 0.0, -hw, -hh, 0.0]
+                uv = [0.0] * 8
+                vd.m_VertexCount = 4
+                vd.m_DataSize = struct.pack("<" + "f" * 20, *(pos + uv))
+                sm = sprite.m_RD.m_SubMeshes[0]
+                sm.indexCount = 6
+                sm.vertexCount = 4
+                sprite.m_RD.m_IndexBuffer = struct.pack("<" + "H" * 6, 3, 0, 1, 2, 1, 0)
+            else:
+                data = vd.m_DataSize
+                floats = list(struct.unpack("<" + "f" * (len(data) // 4), data))
+                pos_n = n * 3
+                if len(floats) >= pos_n:
+                    for i in range(pos_n):
+                        if i % 3 == 0:
+                            floats[i] *= sx
+                        elif i % 3 == 1:
+                            floats[i] *= sy
+                    vd.m_DataSize = struct.pack("<" + "f" * len(floats), *floats)
+        except (AttributeError, TypeError, struct.error):
+            pass
+        # 碰撞形状 m_PhysicsShape（世界坐标）同步缩放
+        try:
+            shape = sprite.m_PhysicsShape
+            for poly in shape:
+                for p in poly:
+                    p.x *= sx
+                    p.y *= sy
+        except (AttributeError, TypeError):
+            pass
     sprite.save()
 
 
@@ -59,6 +114,8 @@ class EncodeHelper:
         path = layer.path if layer.path != "Not Found" else layer.meta.path
         env = UnityPy.load(path)
 
+        # 替换贴图 + mesh：背景（主立绘）repl 已按 rawSpriteSize 缩回，无 mesh 则不触发；
+        # rw 保持原逻辑（repl = rawSpriteSize 显示尺寸，set_mesh 重写网格）
         for x in env.objects:
             match x.type:
                 case ClassIDType.Texture2D:
@@ -66,7 +123,7 @@ class EncodeHelper:
                 case ClassIDType.Mesh:
                     set_mesh(x, layer.repl)
 
-        path = os.path.join(dir, "output", "painting", os.path.basename(path))
+        path = os.path.join(dir, output_dir_name(), "painting", os.path.basename(path))
         check_and_save(path, env.file.save(Config.get_compression()))
 
         if Config.get_face_mode() != FaceModeType.Custom:
@@ -87,8 +144,20 @@ class EncodeHelper:
         layer = first.layer
         face_mode = Config.get_face_mode()
 
-        name = layer.meta.name_stem
-        path = os.path.join(os.path.dirname(layer.meta.path), "paintingface", name)
+        # paintingface 文件与索引文件同名（用户可能改名，文件名 ≠ 内部名 name_stem）
+        name = os.path.basename(layer.meta.path).removesuffix("_n")
+        meta_dir = os.path.dirname(layer.meta.path)
+        root = os.path.dirname(meta_dir)
+        path = next(
+            (p
+             for p in [
+                 os.path.join(meta_dir, "paintingface", name),
+                 os.path.join(root, "paintingface", name),
+             ]
+             if os.path.exists(p)),
+            None,
+        )
+        assert path, f"paintingface not found for {name}"
         env = UnityPy.load(path)
 
         cur, cnt = 0, len(faces)
@@ -103,7 +172,7 @@ class EncodeHelper:
                     cur += 1
                     progress.update(task, advance=1, description=f"Encode paintingface ({cur}/{cnt}):")
 
-        path = os.path.join(dir, "output", "paintingface", name)
+        path = os.path.join(dir, output_dir_name(), "paintingface", name)
         check_and_save(path, env.file.save(Config.get_compression()))
 
         if face_mode == FaceModeType.Off:
@@ -116,7 +185,8 @@ class EncodeHelper:
             anchored_position = prefered.pivotPosition - layer.pivotPosition + layer.anchoredPosition
         elif face_mode == FaceModeType.Custom:
             size_delta = Vector2(first.repl.size)
-            x1, y1, _, _ = Config.get_face_extension(name, "paintingface")
+            # extension 以内部名 name_stem 为 key（导入准备时 set_face_extension 用 name_stem 存）
+            x1, y1, _, _ = Config.get_face_extension(layer.meta.name_stem, "paintingface")
             x_min, y_min, _, _ = layer.box
             pivot = (layer.sizeDelta * layer.pivot - Vector2(max(x1, -x_min), max(y1, -y_min))) / size_delta
             anchored_position = layer.anchoredPosition
@@ -134,7 +204,7 @@ class EncodeHelper:
             elif v.type == ClassIDType.Texture2D:
                 set_tex2d(v.deref_parse_as_object(), icon.repl)
 
-        path = os.path.join(dir, "output", kind, icon.layer.meta.name_stem)
+        path = os.path.join(dir, output_dir_name(), kind, icon.layer.meta.name_stem)
         check_and_save(path, env.file.save(Config.get_compression()))
 
         return path
@@ -144,26 +214,25 @@ class EncodeHelper:
         meta_path = list(layers.values())[0].meta.path
         meta_env = UnityPy.load(meta_path)
         readers = list(meta_env.cabs.values())[0].objects
-        adv_mode = False
         result = []
         with Progress() as progress:
             valid = [v for v in layers.values() if v.modified]
+            painting_modified = valid != []
             if valid != []:
                 cur, cnt = 0, len(valid)
                 task = progress.add_task(f"Encode painting ({cur}/{cnt}):", total=cnt)
                 for x in valid:
-                    sub, flag = EncodeHelper.replace_painting(dir, x, readers[x.pathId])
+                    sub, _ = EncodeHelper.replace_painting(dir, x, readers[x.pathId])
                     result += [sub]
-                    adv_mode |= flag
                     cur += 1
                     progress.update(task, advance=1, description=f"Encode painting ({cur}/{cnt}):")
 
             valid = {k: v for k, v in faces.items() if v.modified}
+            face_modified = valid != {}
             if valid != {}:
                 face_layer = list(valid.values())[0].layer
-                sub, flag = EncodeHelper.replace_face(dir, valid, readers[face_layer.pathId], progress)
+                sub, _ = EncodeHelper.replace_face(dir, valid, readers[face_layer.pathId], progress)
                 result += [sub]
-                adv_mode |= flag
 
             valid = {k: v for k, v in icons.items() if v.modified and os.path.exists(v.path)}
             if valid != {}:
@@ -174,8 +243,11 @@ class EncodeHelper:
                     cur += 1
                     progress.update(task, advance=1, description=f"Encode icon ({cur}/{cnt}):")
 
-        if adv_mode:
-            path = os.path.join(dir, "output", "painting", os.path.basename(meta_path))
+        # 索引 bundle：仅当立绘/表情图层有修改时才输出索引（icons 裁剪不改变索引，
+        # 输出反而会用源索引覆盖同模式下已导入立绘的修改版索引）；
+        # off 模式 painting/face 修改时索引为原样复制，保证替换回游戏时全套覆盖
+        if painting_modified or face_modified:
+            path = os.path.join(dir, output_dir_name(), "painting", os.path.basename(meta_path))
             check_and_save(path, meta_env.file.save(Config.get_compression()))
             result += [path]
 
