@@ -88,6 +88,7 @@ class AzurLaneTachieHelper(QMainWindow):
             FaceModeType.Off: self.tr("Off"),
             FaceModeType.Auto: self.tr("Auto"),
             FaceModeType.Custom: self.tr("Custom"),
+            FaceModeType.Full: self.tr("Full"),
         }
         self.server_map = {"CN": self.tr("CN"), "JP": self.tr("JP"), "EN": self.tr("EN")}
 

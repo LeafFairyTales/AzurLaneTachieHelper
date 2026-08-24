@@ -345,9 +345,10 @@ class Layer:
         self.refresh()
 
 
-def prefered_layer(layers: dict[str, Layer], layer: Layer) -> Layer:
+def prefered_layer(layers: dict[str, Layer], layer: Layer, largest: bool = False) -> Layer:
+    """Auto 模式参考图层：sizeDelta 面积最小（不投影至画布最大）；largest=True 时取最大（Full 模式=背景）。"""
     expands = [x for x in layers.values() if x.name != "face"]
-    return sorted(expands, key=lambda v: v.sizeDelta.prod())[0]
+    return sorted(expands, key=lambda v: v.sizeDelta.prod())[-1 if largest else 0]
 
 
 class BaseLayer:
@@ -384,7 +385,7 @@ class FaceLayer(BaseLayer):
         if face_mode == FaceModeType.Off:
             return self.full.crop(self.layer.box)
 
-        if face_mode == FaceModeType.Auto:
+        if face_mode == FaceModeType.Auto or face_mode == FaceModeType.Full:
             prefered_box = self.prefered.box
         elif face_mode == FaceModeType.Custom:
             face_extension = Config.get_face_extension(self.layer.meta.name_stem, "paintingface")

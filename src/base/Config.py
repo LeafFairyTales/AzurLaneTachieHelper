@@ -81,11 +81,21 @@ def get_verbosity() -> bool:
 
 def get_face_mode() -> FaceModeType:
     face_mode = get_config("system/FaceMode").lower()
-    return {"off": FaceModeType.Off, "auto": FaceModeType.Auto, "custom": FaceModeType.Custom}[face_mode]
+    return {
+        "off": FaceModeType.Off,
+        "auto": FaceModeType.Auto,
+        "custom": FaceModeType.Custom,
+        "full": FaceModeType.Full,
+    }[face_mode]
 
 
 def set_face_mode(mode: FaceModeType) -> FaceModeType:
-    mode_str = {FaceModeType.Off: "off", FaceModeType.Auto: "auto", FaceModeType.Custom: "custom"}[mode]
+    mode_str = {
+        FaceModeType.Off: "off",
+        FaceModeType.Auto: "auto",
+        FaceModeType.Custom: "custom",
+        FaceModeType.Full: "full",
+    }[mode]
     set_config("system/FaceMode", mode_str)
 
 

@@ -178,7 +178,8 @@ class EncodeHelper:
         if face_mode == FaceModeType.Off:
             return path, False
 
-        if face_mode == FaceModeType.Auto:
+        if face_mode == FaceModeType.Auto or face_mode == FaceModeType.Full:
+            # Auto=最小图层（立绘主体），Full=最大图层（背景/整幅画布）：均按参考图层重算布局
             prefered = first.prefered
             size_delta = prefered.sizeDelta
             pivot = prefered.pivot

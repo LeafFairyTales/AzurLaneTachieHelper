@@ -81,11 +81,11 @@ class ImportHelper:
     def _prepare_faces(am: AssetManager, export_dir: str, face_mode: FaceModeType, from_export: bool):
         """faces：按模式分流。
         off   -> repl = decode() 单脸（paintingface 原图）
-        auto/custom -> repl = crop_face()：表情模板 = 立绘合成 + 对应表情图叠加，按 prefered/扩展框裁出
+        auto/full/custom -> repl = crop_face()：表情模板 = 立绘合成 + 对应表情图叠加，按 prefered/扩展框裁出
         from_export 时直接用 export PNG（正像）翻转还原为 repl。
         """
         if am.face_layer is not None:
-            prefered = prefered_layer(am.layers, am.face_layer)
+            prefered = prefered_layer(am.layers, am.face_layer, largest=(face_mode == FaceModeType.Full))
             for v in am.faces.values():
                 v.set_data(am.face_layer, prefered)
             if (
@@ -299,9 +299,9 @@ class ImportHelper:
             v.repl = img
             logger.info(f"painting {tex}: PSD -> repl={img.size} (box={box})")
 
-        # 3) faces：按模式（off=单脸 repl；auto/custom=PSD 画布合成 + 单脸叠加 -> crop_face）
+        # 3) faces：按模式（off=单脸 repl；auto/full/custom=PSD 画布合成 + 单脸叠加 -> crop_face）
         if am.face_layer is not None:
-            prefered = prefered_layer(am.layers, am.face_layer)
+            prefered = prefered_layer(am.layers, am.face_layer, largest=(face_mode == FaceModeType.Full))
             for v in am.faces.values():
                 v.set_data(am.face_layer, prefered)
             if (

@@ -9,6 +9,7 @@ class FaceModeType(Enum):
     Off = 0
     Auto = 1
     Custom = 2
+    Full = 3
 
 
 @dataclass
