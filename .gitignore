@@ -1,4 +1,5 @@
 __pycache__
+.codewhale/
 .DS_Store
 .diag/
 app.build
@@ -16,4 +17,6 @@ src/spine
 *.bat
 *.ini
 *.lock
+!uv.lock
 *.qm
+nuitka-crash-report.xml

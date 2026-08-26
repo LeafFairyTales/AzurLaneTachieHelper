@@ -91,6 +91,91 @@
         <source>Select Reference</source>
         <translation>选择参照图</translation>
     </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="202"/>
+        <source>Select Work Root</source>
+        <translation>选择工作根目录</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="207"/>
+        <source>No ships found in</source>
+        <translation>以下路径未找到舰船</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="210"/>
+        <source>Export PNGs</source>
+        <translation>导出的 PNG</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="210"/>
+        <source>Internal</source>
+        <translation>内部</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="212"/>
+        <source>Importing</source>
+        <translation>正在导入</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="219"/>
+        <source>Import done</source>
+        <translation>导入完成</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="219"/>
+        <source>outputs</source>
+        <translation>输出</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="221"/>
+        <source>Failed</source>
+        <translation>失败</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="236"/>
+        <source>Exporting</source>
+        <translation>正在导出</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="242"/>
+        <source>Export done</source>
+        <translation>导出完成</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="242"/>
+        <source>ships</source>
+        <translation>舰船</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="251"/>
+        <source>Open a metadata first</source>
+        <translation>请先打开元数据</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="255"/>
+        <source>Select PSD</source>
+        <translation>选择 PSD</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="260"/>
+        <source>Importing from PSD</source>
+        <translation>正在从 PSD 导入</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="271"/>
+        <source>On</source>
+        <translation>开</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="272"/>
+        <source>Skip Missing</source>
+        <translation>跳过缺失</translation>
+    </message>
+    <message>
+        <location filename="../src/TachieHelper.py" line="91"/>
+        <source>Full</source>
+        <translation>完整</translation>
+    </message>
 </context>
 <context>
     <name>BaseTable</name>
@@ -122,6 +207,31 @@
         <source>Encode Texture</source>
         <translation>封包立绘</translation>
     </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="36"/>
+        <source>Icon</source>
+        <translation>图标</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="39"/>
+        <source>Clip All Icons</source>
+        <translation>裁剪全部图标</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="40"/>
+        <source>Clip Shipyard Icon</source>
+        <translation>裁剪船坞图标</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="41"/>
+        <source>Clip Herohrz Icon</source>
+        <translation>裁剪横版图标</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="42"/>
+        <source>Clip Square Icon</source>
+        <translation>裁剪方形图标</translation>
+    </message>
 </context>
 <context>
     <name>FaceMode</name>
@@ -144,6 +254,11 @@
         <location filename="../src/ui/Menu.py" line="71"/>
         <source>Custom</source>
         <translation>自定义</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="57"/>
+        <source>Full</source>
+        <translation>完整</translation>
     </message>
 </context>
 <context>
@@ -182,6 +297,31 @@
         <location filename="../src/ui/Menu.py" line="43"/>
         <source>Pull Tachie</source>
         <translation>拉取立绘</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="19"/>
+        <source>Decode to PSD</source>
+        <translation>解码为 PSD</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="20"/>
+        <source>Import From PSD</source>
+        <translation>从 PSD 导入</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="22"/>
+        <source>Export Images</source>
+        <translation>导出图片</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="23"/>
+        <source>Import From Images</source>
+        <translation>从图片导入</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="24"/>
+        <source>Export &amp;&amp; Import</source>
+        <translation>导出并导入</translation>
     </message>
 </context>
 <context>
@@ -225,6 +365,11 @@
         <location filename="../src/ui/Menu.py" line="141"/>
         <source>Option</source>
         <translation>选项</translation>
+    </message>
+    <message>
+        <location filename="../src/ui/Menu.py" line="137"/>
+        <source>Skip Missing Resources</source>
+        <translation>跳过缺失资源</translation>
     </message>
 </context>
 <context>

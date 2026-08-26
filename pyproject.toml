@@ -20,5 +20,8 @@ dependencies = [
 [project.optional-dependencies]
 build = ["nuitka<2.6", "numpy<2.3"]
 
+[tool.uv.sources]
+pytoshop = { git = "https://github.com/MuteApo/pytoshop" }
+
 [[tool.uv.index]]
 url = "https://mirrors.aliyun.com/pypi/simple"

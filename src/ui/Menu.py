@@ -54,12 +54,12 @@ class FaceMode(QMenu):
         self.cbs = cbs
         self.aOff = QAction(self.tr("Off"), checkable=True, triggered=partial(self.toggle, mode=FaceModeType.Off))
         self.aAuto = QAction(self.tr("Auto"), checkable=True, triggered=partial(self.toggle, mode=FaceModeType.Auto))
+        self.aFull = QAction(self.tr("Full"), checkable=True, triggered=partial(self.toggle, mode=FaceModeType.Full))
         self.aCustom = QAction(
             self.tr("Custom"), checkable=True, triggered=partial(self.toggle, mode=FaceModeType.Custom)
         )
-        self.aFull = QAction(self.tr("Full"), checkable=True, triggered=partial(self.toggle, mode=FaceModeType.Full))
 
-        self.addActions([self.aOff, self.aAuto, self.aCustom, self.aFull])
+        self.addActions([self.aOff, self.aAuto, self.aFull, self.aCustom])
         self.flush()
 
     def toggle(self, _: bool, mode: FaceModeType):
