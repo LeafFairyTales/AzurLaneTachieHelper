@@ -4,11 +4,11 @@ from typing import Callable, Self
 from PIL import Image, ImageChops, ImageOps
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import (
+    QIcon,
     QKeyEvent,
     QMouseEvent,
     QPainter,
     QPaintEvent,
-    QPixmap,
     QWheelEvent,
 )
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
@@ -18,6 +18,7 @@ from ..base.Data import IconPreset
 from ..base.Layer import IconLayer
 from ..base.Vector import Vector2
 from ..logger import logger
+from ..utility import resource_path
 
 
 def get_padding(w: int, h: int, center: Vector2, angle: float):
@@ -137,7 +138,7 @@ class IconViewer(QDialog):
     def __init__(self, name: str, refs: dict[str, IconLayer], img: Image.Image, center: Vector2, kinds: list[str] = None):
         super().__init__()
         self.setWindowTitle(self.tr("AzurLane Tachie Helper"))
-        self.setWindowIcon(QPixmap("ico/cheshire.ico"))
+        self.setWindowIcon(QIcon(resource_path("cheshire.ico")))
 
         self.presets = Config.get_presets(name)
         all_kinds = list(self.presets.to_dict().keys())
