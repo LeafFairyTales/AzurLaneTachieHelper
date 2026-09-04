@@ -8,9 +8,9 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QMainWindow,
     QMessageBox,
     QScrollArea,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -19,6 +19,7 @@ from .base import Config
 from .base.Data import FaceModeType
 from .base.Layer import prefered_layer
 from .logger import logger
+from .module_registry import Module, register
 from .module.AssetManager import AssetManager
 from .module.ImportHelper import ImportHelper
 from .ui import Menu
@@ -74,9 +75,12 @@ class PsdImportWorker(QObject):
         self.finished.emit({os.path.basename(self.meta_path): res})
 
 
-class AzurLaneTachieHelper(QMainWindow):
-    def __init__(self):
-        super().__init__()
+@register
+class AzurLaneTachieHelper(Module):
+    name = "Tachie"
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.setWindowTitle(self.tr("AzurLane Tachie Helper") + " (Telegram @LeafFairyTales Edited)")
         self.setAcceptDrops(True)
         self.resize(960, 540)
@@ -102,10 +106,14 @@ class AzurLaneTachieHelper(QMainWindow):
         self.msg_server = QLabel()
         self.msg_skip_missing = QLabel()
 
-        self.statusBar().addWidget(self.msg_file)
-        self.statusBar().addPermanentWidget(self.msg_face_mode)
-        self.statusBar().addPermanentWidget(self.msg_server)
-        self.statusBar().addPermanentWidget(self.msg_skip_missing)
+        bar = QHBoxLayout()
+        bar.setContentsMargins(6, 2, 6, 2)
+        bar.addWidget(self.msg_file, 1)
+        bar.addWidget(self.msg_face_mode)
+        bar.addWidget(self.msg_server)
+        bar.addWidget(self.msg_skip_missing)
+        self.status_row = QWidget()
+        self.status_row.setLayout(bar)
 
     def _init_ui(self):
         self.preview = Previewer(self._encode)
@@ -137,9 +145,15 @@ class AzurLaneTachieHelper(QMainWindow):
         layout.addWidget(sep)
         layout.addWidget(self.preview)
 
-        central_widget = QWidget()
-        central_widget.setLayout(layout)
-        self.setCentralWidget(central_widget)
+        content = QWidget()
+        content.setLayout(layout)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        root.addLayout(self.menu_row)
+        root.addWidget(content, 1)
+        root.addWidget(self.status_row)
 
     def _init_menu(self):
         # File：区域 1 打开文件 / 区域 2 PSD 相关 / 区域 3 普通流程（批量）
@@ -159,9 +173,20 @@ class AzurLaneTachieHelper(QMainWindow):
         )
         self.mOption = Menu.Option(self.refresh_statusbar, self.onToggleFaceMode)
 
-        self.menuBar().addMenu(self.mFile)
-        self.menuBar().addMenu(self.mEdit)
-        self.menuBar().addMenu(self.mOption)
+        def _button(menu):
+            btn = QToolButton()
+            btn.setText(menu.title())
+            btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+            btn.setMenu(menu)
+            btn.setAutoRaise(True)
+            return btn
+
+        self.menu_row = QHBoxLayout()
+        self.menu_row.setContentsMargins(6, 2, 6, 0)
+        self.menu_row.addWidget(_button(self.mFile))
+        self.menu_row.addWidget(_button(self.mEdit))
+        self.menu_row.addWidget(_button(self.mOption))
+        self.menu_row.addStretch(1)
 
     def _start_import_worker(self, worker: ImportWorker):
         self.import_worker = worker
@@ -208,7 +233,7 @@ class AzurLaneTachieHelper(QMainWindow):
             return
         face_mode = Config.get_face_mode()
         source = self.tr("Export PNGs") if from_export else self.tr("Internal")
-        self.statusBar().showMessage(
+        self._status(
             self.tr("Importing") + f" {len(found)} ships ({source}, {face_mode.name.lower()}) ..."
         )
         self._start_import_worker(ImportWorker([p for _, p in found], face_mode, from_export))
@@ -219,7 +244,7 @@ class AzurLaneTachieHelper(QMainWindow):
         msg = self.tr("Import done") + f": {total} " + self.tr("outputs")
         if fails:
             msg += "\n" + self.tr("Failed") + f": {', '.join(fails)}"
-        self.statusBar().showMessage(msg)
+        self._status(msg)
         QMessageBox.information(self, self.tr("AzurLane Tachie Helper"), msg)
 
     def onExportLayers(self):
@@ -233,7 +258,7 @@ class AzurLaneTachieHelper(QMainWindow):
             QMessageBox.warning(self, self.tr("AzurLane Tachie Helper"), self.tr("No ships found in") + f"\n{root}")
             return
         face_mode = Config.get_face_mode()
-        self.statusBar().showMessage(self.tr("Exporting") + f" {len(found)} ships ({face_mode.name.lower()}) ...")
+        self._status(self.tr("Exporting") + f" {len(found)} ships ({face_mode.name.lower()}) ...")
         self._start_export_worker(ExportWorker([p for _, p in found], face_mode))
 
     def onExportDone(self, results: dict):
@@ -242,7 +267,7 @@ class AzurLaneTachieHelper(QMainWindow):
         msg = self.tr("Export done") + f": {len(ok)} " + self.tr("ships")
         if fails:
             msg += "\n" + self.tr("Failed") + f": {', '.join(fails)}"
-        self.statusBar().showMessage(msg)
+        self._status(msg)
         QMessageBox.information(self, self.tr("AzurLane Tachie Helper"), msg)
 
     def onImportPsd(self):
@@ -256,10 +281,13 @@ class AzurLaneTachieHelper(QMainWindow):
         if not psd:
             return
         face_mode = Config.get_face_mode()
-        self.statusBar().showMessage(
+        self._status(
             self.tr("Importing from PSD") + f" {os.path.basename(psd)} ({face_mode.name.lower()}) ..."
         )
         self._start_psd_worker(PsdImportWorker(psd, meta, face_mode))
+
+    def _status(self, text: str):
+        self.msg_file.setText(text)
 
     def refresh_statusbar(self):
         face_mode = self.face_mode_map[Config.get_face_mode()]

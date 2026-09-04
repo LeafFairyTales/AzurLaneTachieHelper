@@ -5,13 +5,20 @@ import subprocess
 import sys
 from ast import literal_eval
 
+# QtWebEngine：无 GPU 环境（VDI）启用 SwiftShader 软件渲染 WebGL，Live2D 预览依赖。
+# 必须在 QApplication 创建前设置。
+os.environ.setdefault(
+    "QTWEBENGINE_CHROMIUM_FLAGS",
+    "--enable-unsafe-swiftshader --use-angle=swiftshader-webgl --ignore-gpu-blocklist",
+)
+
 import qdarktheme
 import UnityPy.config
 from PySide6.QtCore import QTranslator
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from src.TachieHelper import AzurLaneTachieHelper
+from src.shell import ModuleShell
 from src.utility import resource_path
 
 UnityPy.config.FALLBACK_UNITY_VERSION = "2022.3.62f3"
@@ -53,7 +60,7 @@ if __name__ == "__main__":
     box.setStandardButtons(QMessageBox.StandardButton.Ok)
     box.exec()
 
-    win = AzurLaneTachieHelper()
+    win = ModuleShell()
     win.show()
 
     sys.exit(app.exec())
